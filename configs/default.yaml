@@ -1,0 +1,64 @@
+# disorder_fix — Default Experiment Config
+#
+# ALL fields listed here are required unless marked "(optional)".
+# Missing required fields cause a ValidationError at run startup.
+# Copy this file to configs/experiments/YYYYMMDD-<model>-<param>.yaml
+# and override only the fields you want to change.
+
+# ── Reproducibility ─────────────────────────────────────────────────────────
+seed: 42                        # Global random seed (Python, NumPy, PyTorch)
+
+# ── Hardware & Precision ─────────────────────────────────────────────────────
+# REQUIRED: absence of this field is a hard validation error at startup.
+precision: bf16                 # "bf16" or "fp32"
+
+# Device is resolved at startup; never hardcode "cuda:0" in source code.
+device: cuda                    # "cuda" or "cpu"
+
+# ── Sanity Checks ─────────────────────────────────────────────────────────────
+# Runs single-batch overfit test + forward pass smoke test before training.
+# Set enabled to false only with an explicit justification comment.
+sanity_check:
+  enabled: true
+  overfit_steps: 50
+  save_audio: true
+
+# ── Model ─────────────────────────────────────────────────────────────────────
+model:
+  name: UNet                    # Registry key: "UNet" or "DiffusionModel"
+
+# ── Audio Preprocessing ───────────────────────────────────────────────────────
+audio:
+  sample_rate: 22050            # Hz; all audio is resampled to this rate
+  n_fft: 1024                   # FFT window size
+  hop_length: 256               # STFT hop length (samples)
+  n_mels: null                  # (optional) mel bins; null = linear STFT
+
+# ── Masking ───────────────────────────────────────────────────────────────────
+masking:
+  strategy: random              # "random", "causal", or "block"
+  mask_ratio: 0.25              # Fraction of spectrogram frames to mask (0 < ratio < 1)
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+data:
+  dataset_name: ""              # HuggingFace dataset identifier (e.g. "your-org/your-dataset")
+  split_train: train
+  split_val: validation
+  speaker_split:
+    enabled: false
+    # val_speakers: []        # Explicit speaker names (takes precedence over num_val_speakers)
+    num_val_speakers: 2       # Hold out last N speakers alphabetically
+
+# ── Training ──────────────────────────────────────────────────────────────────
+training:
+  batch_size: 16
+  learning_rate: 1.0e-4
+  max_epochs: 100
+  checkpoint_every_n_epochs: 5  # Save both "latest" and "best" checkpoints
+
+# ── Weights & Biases ──────────────────────────────────────────────────────────
+wandb:
+  project: disorder_fix         # W&B project name; never hardcode in source
+  entity: ""                    # W&B entity (username or team); set via config or WANDB_ENTITY env var
+  group: null                   # (optional) run group for related experiments
+  sweep_config: null            # (optional) path to sweep config YAML file

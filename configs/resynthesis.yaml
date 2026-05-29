@@ -1,0 +1,20 @@
+seed: 42
+device: "cuda:0"
+
+omnivoice:
+  model_name: "k2-fsa/OmniVoice"
+  dtype: "float16"
+  num_step: 32
+  speed: 1.0
+  sample_rate: 24000
+
+resynthesis:
+  crossfade_ms: 10.0
+  max_overlap_ms: 50.0
+  guard_ms: 80.0          # 0 for MFA (~10 ms tight); ~80 for GigaAM RNN-T
+  aligner: "gigaam"       # "mfa" or "gigaam"
+  provide_ref_text: true
+  output_sample_rate: null
+
+data:
+  sample_rate: 22050

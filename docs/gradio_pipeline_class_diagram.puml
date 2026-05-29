@@ -1,0 +1,223 @@
+@startuml resynthesis_pipeline_class_diagram
+
+skinparam dpi 150
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam nodesep 10
+skinparam ranksep 24
+skinparam padding 2
+skinparam packageStyle rectangle
+skinparam package {
+    BackgroundColor #F7F7FB
+    BorderColor #888
+}
+skinparam linetype ortho
+top to bottom direction
+hide empty members
+
+' title removed for ПЗ
+
+' ============================================================
+' LAYER 1 — Orchestrator
+' ============================================================
+class ResynthesisPipeline {
+    + device : str
+    + omnivoice_cfg : OmniVoiceConfig
+    + resynthesis_cfg : ResynthesisConfig
+    - _aligner_kind : Literal["mfa", "gigaam"]
+    + aligner : MFAAligner | GigaAMAligner | None
+    + tts : OmniVoiceAdapter
+    - _asr : GigaAMTranscriber | None  <<lazy>>
+    --
+    + process_file(audio_path, transcript, output_path,\n  ref_audio_path?, ref_text?, save_raw_tts?) : ResynthesisResult
+    - _align(audio_path, transcript)
+    - _get_asr() : GigaAMTranscriber
+    - _get_gigaam_aligner() : GigaAMAligner
+    - _match_target_indices(orig, resynth, hard_s) : list[int]
+}
+
+' ============================================================
+' LAYER 2 — Config
+' ============================================================
+package "Config" as PKG_CFG #FFF8EE {
+    class OmniVoiceConfig <<BaseModel>> {
+        + model_name : str
+        + dtype : Literal["float16", "bfloat16"]
+        + num_step : int = 32
+        + speed : float = 1.0
+        + sample_rate : int = 24000
+    }
+    class ResynthesisConfig <<BaseModel>> {
+        + crossfade_ms : float = 10.0
+        + max_overlap_ms : float = 50.0
+        + guard_ms : float = 0.0
+        + aligner : Literal["mfa", "gigaam"] = "mfa"
+        + provide_ref_text : bool = true
+        + output_sample_rate : int | None
+    }
+}
+
+' ============================================================
+' LAYER 3 — Result
+' ============================================================
+package "Result" as PKG_RESULT #F5F5FF {
+    class ResynthesisResult <<dataclass>> {
+        + input_path : str
+        + output_path : str
+        + transcript : str
+        + ref_transcript : str | None
+        + words_detected : int
+        + words_corrected : int
+        + word_details : list[CorrectedWord]
+        + status : ResynthesisStatus
+        + error_message : str | None
+        --
+        + to_dict() : dict
+    }
+    enum ResynthesisStatus {
+        success
+        no_segments_found
+        alignment_failed
+        resynthesis_failed
+        error
+    }
+    class CorrectedWord <<dataclass>> {
+        + word : str
+        + original_start : float
+        + original_end : float
+        + resynth_start : float
+        + resynth_end : float
+        + duration_delta_ms : float
+    }
+}
+
+' ============================================================
+' LAYER 4 — ASR & Alignment
+' ============================================================
+package "ASR & Alignment" as PKG_ALIGN #FFEEEE {
+    class GigaAMTranscriber {
+        - _model : GigaAMModel <<lazy>>
+        + device : torch.device
+        + revision : str = "e2e_rnnt"
+        --
+        + transcribe(audio_path) : str
+        + transcribe_with_timings(audio_path)
+    }
+    class MFAAligner {
+        + acoustic_model : str = "russian_mfa"
+        + dictionary : str = "russian_mfa"
+        + temp_dir : Path
+        --
+        + align_from_file_full(path, text)
+        + cleanup()
+    }
+    class GigaAMAligner {
+        + transcriber : GigaAMTranscriber
+        + late_bias_s : float = 0.080
+        --
+        + align_from_file_full(path, text)
+    }
+    class WordAlignment <<dataclass>> {
+        + word : str
+        + start : float
+        + end : float
+        + phonemes : list[PhonemeAlignment]
+    }
+    class PhonemeAlignment <<dataclass>> {
+        + phoneme : str
+        + start : float
+        + end : float
+    }
+}
+
+' ============================================================
+' LAYER 5 — Hard-S Filter + TTS + Splice (side by side)
+' ============================================================
+package "Hard-S Filter" as PKG_FILTER #FFEEFF {
+    class "hard_s_filter" as HardSFilter <<module>> {
+        + filter_hard_s_words(words, phonemes)
+        + filter_hard_s_words_by_text(words, phonemizer?)
+    }
+    class RussianPhonemizer {
+        + language : str = "ru"
+        --
+        + phonemize(text) : str
+        + get_phoneme_list(text) : list[str]
+    }
+}
+
+package "TTS" as PKG_TTS #EEFFFF {
+    class OmniVoiceAdapter {
+        + cfg : OmniVoiceConfig
+        + device : str
+        + model : OmniVoice
+        --
+        + synthesize(text, ref_audio_path, ref_text?) : (Tensor, int)
+    }
+    class "omnivoice.OmniVoice" as OmniVoice <<external>> {
+        + from_pretrained(name, device_map, dtype)
+        + generate(text, ref_audio, num_step, speed)
+    }
+}
+
+package "Splice & Audio I/O" as PKG_SPLICE #EEFFEE {
+    class "word_splice" as WordSplice <<module>> {
+        + splice_words(original_waveform, original_sr,\n  original_words, resynth_waveform, resynth_sr,\n  resynth_words, target_word_indices,\n  crossfade_ms, max_overlap_ms, guard_ms) : Tensor
+    }
+    class "audio_adapter" as AudioAdapter <<module>> {
+        + save_waveform(wav, path, sr)
+        + load_waveform(path, sample_rate) : Tensor
+    }
+}
+
+' ============================================================
+' Vertical stacking
+' ============================================================
+ResynthesisPipeline -[hidden]down-> PKG_CFG
+PKG_CFG -[hidden]down-> PKG_RESULT
+PKG_RESULT -[hidden]down-> PKG_ALIGN
+PKG_ALIGN -[hidden]down-> PKG_FILTER
+PKG_FILTER -[hidden]right-> PKG_TTS
+PKG_TTS -[hidden]right-> PKG_SPLICE
+
+' ============================================================
+' Relations
+' ============================================================
+' Pipeline -> Config
+ResynthesisPipeline o-down- OmniVoiceConfig
+ResynthesisPipeline o-down- ResynthesisConfig
+
+' Pipeline -> Result
+ResynthesisPipeline .down.> ResynthesisResult : returns
+ResynthesisResult .right.> ResynthesisStatus
+ResynthesisResult "1" *-down- "*" CorrectedWord
+
+' Pipeline -> Aligners
+ResynthesisPipeline o-down- MFAAligner : aligner\n(kind=="mfa")
+ResynthesisPipeline o-down- GigaAMAligner : aligner\n(kind=="gigaam")
+ResynthesisPipeline o-down- GigaAMTranscriber : _asr (lazy)
+
+' Pipeline -> Filter / TTS / Splice
+ResynthesisPipeline .down.> HardSFilter
+ResynthesisPipeline *-down- OmniVoiceAdapter
+ResynthesisPipeline .down.> WordSplice
+ResynthesisPipeline .down.> AudioAdapter
+
+' Alignment internals
+GigaAMAligner *-down- GigaAMTranscriber
+MFAAligner .down.> WordAlignment : creates
+MFAAligner .down.> PhonemeAlignment : creates
+GigaAMAligner .down.> WordAlignment : creates
+WordAlignment "1" *-right- "*" PhonemeAlignment
+
+' Filter internals
+HardSFilter .down.> RussianPhonemizer
+
+' TTS internals
+OmniVoiceAdapter *-down- OmniVoice
+
+' Splice
+WordSplice .left.> WordAlignment
+
+@enduml

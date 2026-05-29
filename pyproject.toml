@@ -1,0 +1,93 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sigmatism-fix"
+version = "0.1.0"
+description = "Real-time hard-S (sigmatism) speech correction: OmniVoice TTS + GigaAM-v3 ASR/aligner pipeline, optimized for low-latency GPU serving (Triton + TensorRT)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+
+# Core runtime needed to import and run the resynthesis pipeline on a GPU.
+dependencies = [
+    "torch==2.6.0",
+    "torchaudio==2.6.0",
+    "numpy>=2.0",
+    "omegaconf==2.3.0",
+    "pydantic==2.7.4",
+    "huggingface-hub>=1.10.1",
+    "soundfile==0.13.1",
+    "librosa==0.11.0",
+    "typing_extensions>=4.10.0",
+]
+
+[project.optional-dependencies]
+# ASR (GigaAM-v3) + text-side hard-S detection (espeak via phonemizer).
+inference = [
+    "transformers>=5.5.0,<6.0",
+    "sentencepiece>=0.2.0",
+    "phonemizer>=3.2.1",
+    "safetensors>=0.4",
+]
+# OmniVoice zero-shot TTS.
+resynthesis = [
+    "omnivoice>=0.1.0",
+]
+# Gradio demo UI.
+app = [
+    "gradio>=4.44,<6",
+]
+# Triton Inference Server client + export tooling.
+# NOTE: tensorrt / torch-tensorrt are environment-specific and are best installed
+# from the NVIDIA NGC PyTorch/Triton container, not pinned here. See README.
+serving = [
+    "tritonclient[all]>=2.40",
+    "onnx>=1.16",
+    "onnxruntime-gpu>=1.18",
+]
+# HuggingFace dataset loading for batch correction (ResynthesisPipeline.process_batch).
+batch = [
+    "datasets>=3.0",
+]
+dev = [
+    "pytest==8.2.2",
+    "pytest-cov==5.0.0",
+    "ruff==0.4.10",
+    "pre-commit==3.7.1",
+    "pandas",
+    "pyarrow",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "gpu: tests requiring CUDA",
+    "real_mfa: tests that need the real Montreal Forced Aligner (opt out of the global MFA mock in conftest.py)",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501", "N806", "N812"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

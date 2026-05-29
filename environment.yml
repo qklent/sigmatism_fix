@@ -1,0 +1,11 @@
+name: sigmatism
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # Montreal Forced Aligner — only needed for the phoneme-level `aligner: "mfa"`
+  # backend. The default `aligner: "gigaam"` path does not require it.
+  - montreal-forced-aligner
+  - pip
+  - pip:
+    - -e .[dev,inference,resynthesis,app]

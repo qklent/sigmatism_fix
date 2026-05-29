@@ -1,0 +1,28 @@
+repos:
+  # ── General file hygiene ───────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+
+  # ── Secret detection ──────────────────────────────────────────────────────
+  # Blocks commits that accidentally contain credentials or API keys.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+
+  # ── Ruff: lint + format ───────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format

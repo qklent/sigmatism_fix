@@ -1,0 +1,71 @@
+# ── Data & Artifacts ────────────────────────────────────────────────────────
+data/raw/
+data/processed/
+data/app_runs/
+outputs/
+runs/
+
+# ── Model Checkpoints & Exported Engines ─────────────────────────────────────
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.engine          # TensorRT serialized engines (device-specific, never commit)
+*.plan            # Triton TensorRT plan files
+
+# ── Triton model repository (large weights live here at runtime) ─────────────
+model_repository/**/*.onnx
+model_repository/**/*.plan
+model_repository/**/*.engine
+model_repository/**/1/model.*
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+*.egg
+
+# ── Environment & Credentials ────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Benchmark / profiling artifacts ──────────────────────────────────────────
+benchmarks/results/
+*.nsys-rep
+*.qdrep
+*.json.gz
+
+# ── Notebooks ────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# ── Claude Code ──────────────────────────────────────────────────────────────
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
+# ── Editor & OS ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+.vscode/
+.idea/
+
+# ── Coverage & Test Artifacts ────────────────────────────────────────────────
+.coverage
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+coverage.json
